@@ -1,0 +1,33 @@
+---
+- name: Install Git
+  hosts: all
+  become: true
+  tasks:
+    - name: Detect OS
+      ansible.builtin.debug:
+        msg: "Installing Git on {{ ansible_distribution }}"
+
+    # === Debian/Ubuntu ===
+    - name: Install Git (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: git
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    # === Rocky/CentOS ===
+    - name: Install Git (Rocky/CentOS)
+      ansible.builtin.yum:
+        name: git
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    # === Optional verification ===
+    - name: Check Git version
+      ansible.builtin.command: git --version
+      register: git_version
+      changed_when: false
+
+    - name: Display installed Git version
+      ansible.builtin.debug:
+        msg: "{{ git_version.stdout }}"

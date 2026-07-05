@@ -1,0 +1,21 @@
+---
+- name: Install uv (Python environment manager)
+  hosts: all
+  become: false  # tidak perlu sudo
+  tasks:
+    - name: Download and install uv via official script
+      ansible.builtin.shell: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        executable: /bin/bash
+        creates: "{{ ansible_env.HOME }}/.local/bin/uv"
+
+    - name: Verify uv installation
+      ansible.builtin.command: "{{ ansible_env.HOME }}/.local/bin/uv --version"
+      register: uv_version
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display installed uv version
+      ansible.builtin.debug:
+        msg: "{{ uv_version.stdout | default('uv not found') }}"

@@ -1,0 +1,42 @@
+---
+- name: Install Rust (aktif langsung tanpa logout)
+  hosts: all
+  become: false
+  tasks:
+    - name: Pastikan curl sudah terinstal
+      ansible.builtin.package:
+        name: curl
+        state: present
+      become: true
+
+    - name: Install Rust via rustup
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      args:
+        creates: "{{ ansible_env.HOME }}/.cargo/bin/rustc"
+
+    - name: Source environment cargo agar aktif langsung
+      ansible.builtin.shell: |
+        source $HOME/.cargo/env
+        echo "PATH updated for this session"
+      args:
+        executable: /bin/bash
+
+    - name: Tambahkan Rust ke PATH permanen di .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ ansible_env.HOME }}/.bashrc"
+        line: 'source $HOME/.cargo/env'
+        state: present
+
+    - name: Verifikasi instalasi Rust
+      ansible.builtin.shell: |
+        source $HOME/.cargo/env
+        rustc --version
+      args:
+        executable: /bin/bash
+      register: rust_version
+      changed_when: false
+
+    - name: Tampilkan versi Rust
+      ansible.builtin.debug:
+        msg: "Rust berhasil diinstal: {{ rust_version.stdout }}"

@@ -1,0 +1,58 @@
+---
+- name: Compliance Test - SSH Connectivity
+  hosts: "{{ limit_group | default('all') }}"
+  gather_facts: false
+  vars:
+    ansible_connection: local
+    ansible_become: false
+
+  tasks:
+    - name: Get local public IP
+      ansible.builtin.uri:
+        url: https://ifconfig.me/ip
+        return_content: yes
+      run_once: true
+      register: my_ip
+      ignore_errors: yes
+
+    - name: Resolve SSH config (hostname, port, user)
+      ansible.builtin.shell:
+        cmd: |
+          ssh -G {{ inventory_hostname }} 2>/dev/null | awk '/^hostname / {print $2} /^port / {print $2} /^user / {print $2}'
+        executable: /bin/bash
+      register: ssh_config
+      changed_when: false
+      check_mode: no
+
+    - name: Set resolved SSH params
+      ansible.builtin.set_fact:
+        ssh_host: "{{ ssh_config.stdout_lines[0] | default(inventory_hostname, true) }}"
+        ssh_port: "{{ ssh_config.stdout_lines[1] | default('22', true) }}"
+        ssh_user: "{{ ssh_config.stdout_lines[2] | default('root', true) }}"
+
+    - name: Test TCP connectivity to port {{ ssh_port }}
+      ansible.builtin.wait_for:
+        host: "{{ ssh_host }}"
+        port: "{{ ssh_port | int }}"
+        state: started
+        timeout: 5
+      register: tcp_result
+      ignore_errors: yes
+
+    - name: Test SSH authentication
+      ansible.builtin.shell:
+        cmd: |
+          ssh -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=5 \
+              -o BatchMode=yes \
+              -p {{ ssh_port }} \
+              {{ ssh_user }}@{{ ssh_host }} \
+              "echo connected"
+        executable: /bin/bash
+      register: ssh_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> TCP:{{ 'OK' if tcp_result.state is defined else 'FAIL' }} SSH:{{ 'OK' if ssh_result.rc == 0 else 'FAIL' }}"
