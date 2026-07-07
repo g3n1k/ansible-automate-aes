@@ -24,7 +24,7 @@ run:
 
 bootstrap:
 	ansible-playbook -i inventory.ini 00-bootstrap-ansible-user.yml -l $(l) \
-		--extra-vars 'ansible_become_password=$(p) bootstrap_user=ub' -vvv
+		--extra-vars 'ansible_become_password=$(p) bootstrap_user=$(if $(u),$(u),ub)' -vvv
 
 # experimental
 compliance:
