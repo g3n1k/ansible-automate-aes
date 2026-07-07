@@ -20,11 +20,16 @@ default:
 	@echo "  compliance  - test SSH connectivity to servers"
 
 run:
-	ansible-playbook -i inventory.ini $(c).yml $(if $(l),-l $(l),)  --ask-vault-pass
+	ansible-playbook -i inventory.ini $(c).yml $(if $(l),-l $(l),) 
 
 bootstrap:
 	ansible-playbook -i inventory.ini 00-bootstrap-ansible-user.yml -l $(l) \
-		--extra-vars 'ansible_become_password=$(p)' -vvv
+		--extra-vars 'ansible_become_password=$(p) bootstrap_user=ub' -vvv
 
+# experimental
 compliance:
 	ansible-playbook -i inventory.ini compliance-test-server.yml $(if $(l),-l $(l),) -v
+
+clear:
+	echo "Cleaning up..."
+	rm -rf ~/.ansible/cp/
