@@ -44,9 +44,6 @@ bootstrap:
 setup-vm:
 	ansible-playbook -i inventory.ini setup-vm.yml $(if $(l),-l $(l),) --extra-vars '{"ansible_host": "$(ssh_host)", "ansible_user": "$(ssh_user)", "ansible_port": $(ssh_port), "setup_user": "$(setup_user)", "setup_host": "$(setup_host)", "setup_home": "$(setup_home)", "setup_password": "$(setup_password)", "setup_key": "$(setup_key)", "ansible_password": "$(ssh_password)", "ansible_become_password": "$(if $(p),$(p),$(setup_password))"}'
 
-install-ntp:
-	ansible-playbook -i inventory.ini install-ntp.yml $(if $(l),-l $(l),) -v
-
 # experimental
 compliance:
 	ansible-playbook -i inventory.ini compliance-test-server.yml $(if $(l),-l $(l),) -v
