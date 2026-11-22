@@ -1,0 +1,67 @@
+---
+- name: Setup awal VM (user, password, ssh key, home, hapus user, rename host, sudo ws)
+  hosts: vm
+  gather_facts: true
+  become: true
+
+  vars:
+    setup_host: waskop
+    setup_user: ub
+    setup_home: /home/ub
+    setup_password: ""
+    setup_key: ""
+    users_to_remove:
+      - ubuntu
+      - admin
+      - debian
+      - pi
+      - ec2-user
+      - azureuser
+      - fedora
+      - centos
+      - rocky
+      - almalinux
+
+  tasks:
+    - name: Set hostname VM
+      ansible.builtin.hostname:
+        name: "{{ setup_host }}"
+
+    - name: Tambah hostname ke /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        create: true
+        owner: root
+        group: root
+        mode: '0644'
+        line: "{{ ansible_host | default(inventory_hostname) }} {{ setup_host }}"
+        regexp: '^{{ ansible_host | default(inventory_hostname) }}\s+{{ setup_host }}$'
+
+    - name: Hapus user lain (keep setup_user)
+      ansible.builtin.user:
+        name: "{{ item }}"
+        state: absent
+        remove: true
+      loop: "{{ users_to_remove }}"
+      loop_control:
+        label: "{{ item }}"
+      when: item != setup_user
+
+    - name: Run bootstrap setup-vm script
+      ansible.builtin.command:
+        argv:
+          - bash
+          - /home/g3n1k/workspace/ansible/bootstrap-setup-vm.sh
+          - "{{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }}"
+          - "{{ setup_password }}"
+          - "{{ setup_user }}"
+          - "{{ setup_home }}"
+          - "{{ setup_key }}"
+      register: result
+      changed_when: result.rc == 0
+      delegate_to: localhost
+      become: false
+
+    - name: Show bootstrap result
+      ansible.builtin.debug:
+        var: result.stdout_lines

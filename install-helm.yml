@@ -1,0 +1,41 @@
+---
+- name: Instalasi Helm CLI di K3s Master Node
+  hosts: k3s_master
+  become: true
+  tasks:
+    - name: Download Script Installer Helm Resmi
+      get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: '0700'
+
+    - name: Eksekusi Instalasi Helm
+      command: /tmp/get_helm.sh
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Hapus File Installer Temporer
+      file:
+        path: /tmp/get_helm.sh
+        state: absent
+
+    - name: Set Environment KUBECONFIG untuk User (Agar Helm Bisa Akses K3s)
+      lineinfile:
+        path: "/home/{{ ansible_user }}/.bashrc"
+        line: 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml'
+        state: present
+        create: yes
+
+    - name: Berikan Izin Baca file k3s.yaml untuk User
+      file:
+        path: /etc/rancher/k3s/k3s.yaml
+        mode: '0644'
+
+    - name: Verifikasi Instalasi Helm
+      command: helm version
+      register: helm_version_out
+      changed_when: false
+
+    - name: Tampilkan Versi Helm
+      debug:
+        msg: "{{ helm_version_out.stdout }}"

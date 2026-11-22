@@ -1,0 +1,46 @@
+---
+- name: Instalasi K9s CLI di K3s Master Node
+  hosts: k3s_master
+  become: true
+  vars:
+    k9s_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+  tasks:
+    - name: Ambil Versi Terbaru K9s dari GitHub API
+      uri:
+        url: https://api.github.com/repos/derailed/k9s/releases/latest
+        return_content: yes
+      register: k9s_release
+
+    - name: Set Fakta Versi K9s
+      set_fact:
+        k9s_version: "{{ k9s_release.json.tag_name | regex_replace('^v', '') }}"
+
+    - name: Download Paket K9s
+      get_url:
+        url: "https://github.com/derailed/k9s/releases/download/v{{ k9s_version }}/k9s_Linux_{{ k9s_arch }}.tar.gz"
+        dest: /tmp/k9s.tar.gz
+        mode: '0600'
+
+    - name: Ekstrak Binary K9s ke /usr/local/bin
+      ansible.builtin.unarchive:
+        src: /tmp/k9s.tar.gz
+        dest: /usr/local/bin
+        remote_src: yes
+        mode: '0755'
+        include:
+          - k9s
+
+    - name: Hapus File Installer Temporer
+      file:
+        path: /tmp/k9s.tar.gz
+        state: absent
+
+    - name: Verifikasi Instalasi K9s
+      command: k9s version
+      register: k9s_version_out
+      changed_when: false
+
+    - name: Tampilkan Versi K9s
+      debug:
+        msg: "{{ k9s_version_out.stdout_lines[0] }}"

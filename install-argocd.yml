@@ -1,0 +1,69 @@
+---
+- name: Instalasi ArgoCD menggunakan Helm di Master Node
+  hosts: k3s_master
+  become: true
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - name: Install Dependensi Python dan Helm via APT Sistem
+      apt:
+        name:
+          - python3-kubernetes
+          - python3-jsonpatch
+          - python3-yaml
+        state: present
+        update_cache: yes
+
+    - name: Tambahkan Repository Helm Argo
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
+
+    - name: Buat Namespace 'argocd' di K3s
+      kubernetes.core.k8s:
+        name: argocd
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Deploy ArgoCD menggunakan Helm Chart
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        create_namespace: false
+        wait: true
+        timeout: "600s"
+        values:
+          server:
+            service:
+              type: NodePort
+              nodePortHttp: 30080
+
+    - name: Tunggu Pod ArgoCD Server Siap
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: argocd
+        label_selectors:
+          - app.kubernetes.io/name=argocd-server
+      register: argocd_pod
+      until: "argocd_pod.resources | length > 0 and (argocd_pod.resources[0].status.phase | default('')) == 'Running'"
+      retries: 30
+      delay: 10
+
+    - name: Ambil Secret Password Default Admin ArgoCD
+      command: >
+        k3s kubectl -n argocd get secret argocd-initial-admin-secret
+        -o jsonpath="{.data.password}"
+      register: raw_password
+      changed_when: false
+
+    - name: Tampilkan Informasi Akses ArgoCD
+      debug:
+        msg:
+          - "=========================================================="
+          - "INSTALASI ARGOCD SELESAI!"
+          - "URL Dashboard : http://{{ ansible_host }}:30080"
+          - "Username      : admin"
+          - "Password      : {{ raw_password.stdout | b64decode }}"
+          - "=========================================================="

@@ -1,0 +1,44 @@
+---
+- name: Install GitLab Runner
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+        state: present
+
+    - name: Check if gitlab-runner binary already exists
+      stat:
+        path: /usr/local/bin/gitlab-runner
+      register: runner_bin
+
+    - name: Download GitLab Runner binary
+      get_url:
+        url: https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64
+        dest: /usr/local/bin/gitlab-runner
+        mode: '0755'
+      when: not runner_bin.stat.exists
+
+    - name: Create GitLab Runner user
+      user:
+        name: gitlab-runner
+        comment: 'GitLab Runner'
+        create_home: yes
+        shell: /bin/bash
+
+    - name: Install GitLab Runner as a service
+      command: gitlab-runner install --user=gitlab-runner --working-directory=/home/gitlab-runner
+      args:
+        creates: /etc/systemd/system/gitlab-runner.service
+
+    - name: Start GitLab Runner service
+      systemd:
+        name: gitlab-runner
+        state: started
+        enabled: true

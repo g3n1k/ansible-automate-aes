@@ -1,0 +1,65 @@
+---
+- name: Persiapan Awal di Semua Node
+  hosts: k3s_cluster
+  become: true
+  tasks:
+    - name: Matikan Swap Secara Temporer
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Hapus entry Swap dari /etc/fstab (Permanen setelah Reboot)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#\s]+\s+swap\s+.*)$'
+        replace: '# \1'
+
+    - name: Update apt cache dan install paket pendukung
+      apt:
+        name:
+          - curl
+          - open-iscsi
+          - nfs-common
+        state: present
+        update_cache: yes
+
+- name: Instalasi K3s Master (Control Plane)
+  hosts: k3s_master
+  become: true
+  tasks:
+    - name: Download dan Install K3s Server
+      shell: |
+        curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Ambil K3s Node Token dari Master
+      command: cat /var/lib/rancher/k3s/server/node-token
+      register: k3s_node_token
+      changed_when: false
+
+    - name: Simpan Token ke dalam Variable Global
+      set_fact:
+        token: "{{ k3s_node_token.stdout }}"
+
+- name: Instalasi K3s Worker (Agents)
+  hosts: k3s_node
+  become: true
+  tasks:
+    - name: Download dan Hubungkan K3s Agent ke Master
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL="https://{{ hostvars[groups['k3s_master'][0]]['ansible_host'] }}:6443" K3S_TOKEN="{{ hostvars[groups['k3s_master'][0]]['token'] }}" sh -
+      args:
+        creates: /usr/local/bin/k3s-agent
+
+- name: Verifikasi Cluster di Master Node
+  hosts: k3s_master
+  become: true
+  tasks:
+    - name: Cek Status Semua Node
+      command: k3s kubectl get nodes
+      register: cluster_nodes
+      changed_when: false
+
+    - name: Tampilkan Hasil `kubectl get nodes`
+      debug:
+        msg: "{{ cluster_nodes.stdout_lines }}"

@@ -7,16 +7,6 @@
       ansible.builtin.debug:
         msg: "Detected OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
 
-    - name: Ensure dependencies are installed
-      ansible.builtin.apt:
-        name:
-          - curl
-          - apt-transport-https
-          - gnupg
-        state: present
-        update_cache: yes
-      when: ansible_os_family == "Debian"
-
     - name: Add Cloudflare GPG key
       ansible.builtin.shell: |
         curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
@@ -28,7 +18,17 @@
       ansible.builtin.copy:
         dest: /etc/apt/sources.list.d/cloudflare-client.list
         content: |
-          deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared {{ ansible_distribution_release }} main
+          deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure dependencies are installed
+      ansible.builtin.apt:
+        name:
+          - curl
+          - apt-transport-https
+          - gnupg
+        state: present
+        update_cache: yes
       when: ansible_os_family == "Debian"
 
     - name: Update apt cache and install Cloudflared
